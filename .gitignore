@@ -1,0 +1,10 @@
+# LLISTA BLANCA: ignora-ho absolutament tot per defecte.
+*
+
+# Desbloqueja NOMÉS el que és públic i verificat:
+!.gitignore
+!README.md
+!emit_public_hashes.py
+!digest_daily.py
+!public_hashes.jsonl
+!digest_ledger.jsonl
