@@ -9,3 +9,7 @@
 !public_hashes.jsonl
 !digest_ledger.jsonl
 !digest_ledger.jsonl.ots
+
+# Vectors d'entrada publicats (pre-registrats abans de la classificacio):
+!nasa_seed_vector.json
+!nasa_seed_vector.json.ots
