@@ -221,3 +221,64 @@ code in this repository. If something here does not match what you can recompute
 that mismatch is provable by anyone — you do not need us to confirm it, or even to reach us.
 That is the point: the integrity of this record does not depend on trusting, or contacting,
 its authors. Check it yourself; the files are all here.*
+
+## 11. Input vectors — verifying the data → input_hash link
+
+Sections 4–10 prove the chain `result_hash` → Merkle root → Bitcoin. That
+chain does **not** need the input vectors — see §5. This section adds a
+*separate, optional* layer: raw input vectors are published so the link
+**raw data → `input_hash`** is also reproducible, not just committed.
+
+Two files per published vector:
+
+- `<name>.json` — the 600-point window, one `[timestamp, value]` pair per
+  point, plus metadata (node, first_ts, last_ts, capture time, note).
+- `<name>.json.ots` — an OpenTimestamps proof of that file (verify as in §10).
+
+**How to verify a vector against the ledger.** The engine's `input_hash`
+(stored as `vector_hash_sha256` in the experiment ledger) is computed over the
+list of values alone — not the `[ts, value]` pairs:
+
+    python3 -c "import json,hashlib; \
+    d=json.load(open('nasa_vector_2026-07-16.json')); \
+    vals=[p[1] for p in d['series']]; \
+    print(hashlib.sha256(json.dumps(vals).encode('utf-8')).hexdigest())"
+
+This must equal the `vector_hash_sha256` recorded for that classification
+(for the file above: `76d6d4c4af7763fa224d9ef896a0fe465c32ceabf8bb2a64b516cf0c928927a0`).
+
+The serialization is Python's `json.dumps` defaults: separators `", "` / `": "`,
+integral floats printed as `1.0`, values in stored order. A JSON reproducer
+must match these byte-for-byte.
+
+**Coverage — read this before assuming symmetry across domains.** Publishing an
+input vector requires that the exact 600-point window still exists. This is not
+equally true for all domains:
+
+- **NASA** is a special, pre-registered case. Its seed window was captured by
+  hand on 2026-06-24 and Bitcoin-anchored *before* the engine's first
+  classification, so past windows can be reconstructed and published.
+- **ENTSO-E and NOAA (NDBC)** have no equivalent. Their buffers are trimmed on
+  every tick and only the `input_hash` was ever stored — never the points.
+  Their past therefore survives **only as a commitment (hash)**, which is
+  irrecoverable by design. No upload can reopen it; this is documented, not
+  fixed.
+- **Going forward**, from a defined start date the client will persist every
+  dispatched vector, so all three domains will publish exact vectors from that
+  date on. Before it: hash only. After it: hash **and** vector.
+
+Published so far:
+
+- `nasa_seed_vector.json` — the NASA:GLOBAL seed window (1976-06 → 2026-05),
+  captured 2026-06-24, Bitcoin-anchored **before** the engine's first
+  classification. A pre-registration.
+- `nasa_vector_2026-07-16.json` — the exact 600-point window the engine
+  classified at dispatch 2026-07-16T12:00:13Z (1976-07 → 2026-06). 599 of its
+  points are identical to the seed; the only new point is 2026-06, frozen by
+  first-write-wins.
+
+**File integrity.** The published `.json` file itself is sealed by its `.ots`
+proof; its SHA-256 (`sha256sum <name>.json`) is what the OpenTimestamps proof
+covers. Note this is a *different* hash from the `input_hash` above: the first
+is the hash of the file as published, the second is the engine's hash over the
+600 values. They are not expected to match.
