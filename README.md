@@ -5,8 +5,7 @@
     - file formats, Merkle root, digest chain (§3/§5/§6) against digest_daily.py
     - OTS commands (§10) tested against OpenTimestamps client 0.7.2 on VPS1
   No PENDING blocks remain. Ready to place in the repo at genesis.
-  Still to add later by commit (additive, non-blocking): Zenodo DOI (§9),
-  VPS2 latency artifact chapter.
+  Still to add later by commit (additive, non-blocking): VPS2 latency artifact chapter.
 -->
 
 # HIMI — Cross-Domain Integrity Record
@@ -172,7 +171,7 @@ Data is pulled by domain-specific fetchers (NOAA NDBC, ENTSO-E, NASA GISTEMP) un
 strict ingest rules: **resolve-once**, **first-write-wins**, **no imputation**, **no
 backfill**. This README documents *how to verify the record*, not the full method. The
 complete, reproducible methodology — engine design, normalization, the five-state
-consensus — lives in the Zenodo publication (DOI to be added here by commit).
+consensus — lives in the Zenodo publication (concept DOI 10.5281/zenodo.20687567, which always resolves to the latest version).
 
 ## 10. How to check the Bitcoin anchor
 
