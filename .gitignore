@@ -1,7 +1,7 @@
-# LLISTA BLANCA: ignora-ho absolutament tot per defecte.
+# WHITELIST: ignore absolutely everything by default.
 *
 
-# Desbloqueja NOMÉS el que és públic i verificat:
+# Unblock ONLY what is public and verified:
 !.gitignore
 !README.md
 !emit_public_hashes.py
@@ -10,7 +10,7 @@
 !digest_ledger.jsonl
 !digest_ledger.jsonl.ots
 
-# Vectors d'entrada publicats (pre-registrats abans de la classificacio):
+# Published input vectors (pre-registered before classification):
 !nasa_seed_vector.json
 !nasa_seed_vector.json.ots
 !nasa_vector_2026-07-16.json
