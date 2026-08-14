@@ -1,69 +1,69 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-emit_public_hashes.py  —  derivador del sidecar public_hashes.jsonl de HIMI
+emit_public_hashes.py  —  derives HIMI's public_hashes.jsonl sidecar
 
-OBJECTIU
---------
-Derivar `public_hashes.jsonl` (els result_hash de TOTES les entrades del ledger,
-EN ORDRE FISIC D'ESCRIPTURA) llegint DIRECTAMENT el ledger INTERN de VPS1:
+PURPOSE
+-------
+Derive `public_hashes.jsonl` (the result_hash of ALL ledger entries,
+IN PHYSICAL WRITE ORDER) by reading VPS1's INTERNAL ledger DIRECTLY:
 
-    /opt/himi/data/gr7_track_record.json   (JSONL, una entrada per linia, sencer)
+    /opt/himi/data/gr7_track_record.json   (JSONL, one entry per line, complete)
 
-Aquest fitxer derivat es el que es PUBLICA a Cloudflare i el que s'ANCORA (OTS).
+This derived file is the one PUBLISHED to Cloudflare and the one ANCHORED (OTS).
 
-PER QUE AIXI (sintesi A->B, decidida amb els ulls oberts)
----------------------------------------------------------
-A i B semblaven excloents:
-  - A (ancorar l'intern): ordre fisic perfecte, pero el public no ho veu byte-a-byte.
-  - B (ancorar el public): mes fort per un auditor, pero ledger_recent.json esta
-    AGRUPAT per node i retallat a 500/node -> ni ordre ni conjunt sencer.
+WHY THIS WAY (A->B synthesis, decided with eyes open)
+-----------------------------------------------------
+A and B looked mutually exclusive:
+  - A (anchor the internal one): perfect physical order, but the public can't see it byte-for-byte.
+  - B (anchor the public one): stronger for an auditor, but ledger_recent.json is
+    GROUPED by node and trimmed to 500/node -> neither order nor the complete set.
 
-La sintesi les fa convergir en UN sol fitxer:
-  1. Llegim la font d'A: el ledger intern, JSONL, ORDRE FISIC, SENCER.
-     L'ordre fisic (no el timestamp) es la veritat canonica de tot l'experiment:
-     first-write-wins / resolve-once / no-backfilling / no-imputation. Els
-     timestamps EMPATEN entre entrades del mateix tick de dispatch (verificat al
-     fitxer real: dues entrades amb timestamp 1783088707), aixi que ordenar per
-     timestamp seria incorrecte. L'ordre de linia es l'unica veritat.
-  2. Emetem `public_hashes.jsonl` derivat i el PUBLIQUEM a Cloudflare.
-     Es descarregable -> "el que segello es exactament el que veus" (la forca de B).
-  3. Cada fulla es el `result_hash` que el navegador ja sap recalcular fila a fila.
-     L'auditor no ha de confiar en res: agafa els hashes publicats, els ordena tal
-     com estan, construeix l'arrel Merkle i la compara amb l'ancorada (OTS).
+The synthesis makes them converge into ONE single file:
+  1. We read A's source: the internal ledger, JSONL, PHYSICAL ORDER, COMPLETE.
+     Physical order (not the timestamp) is the canonical truth of the whole experiment:
+     first-write-wins / resolve-once / no-backfilling / no-imputation. The
+     timestamps TIE between entries of the same dispatch tick (verified in the
+     real file: two entries with timestamp 1783088707), so ordering by
+     timestamp would be incorrect. Line order is the only truth.
+  2. We emit the derived `public_hashes.jsonl` and PUBLISH it to Cloudflare.
+     It is downloadable -> "what I seal is exactly what you see" (B's strength).
+  3. Each leaf is the `result_hash` the browser already knows how to recompute row by row.
+     The auditor need not trust anything: takes the published hashes, orders them
+     as they are, builds the Merkle root and compares it with the anchored one (OTS).
 
-HONESTEDAT D'ABAST (imprescindible, no barrejar)
------------------------------------------------
-  - `public_hashes.jsonl` cobreix el LEDGER SENCER -> l'arrel Merkle oficial
-    (OTS-segellada) es sobre TOTES les entrades en ordre fisic.
-  - `ledger_recent.json` (finestra 500/node, agrupat) NO es la font d'aquest fitxer.
-    La seva `merkle_root_recent` es NOMES informativa. Cal etiquetar els dos roots
-    perque un auditor no els confongui.
-  - La recomputacio fila-a-fila del navegador (verificar que cada result_hash es un
-    output HIMI genui) es un check SEPARAT i limitat als vectors que es publiquin;
-    la verificacio del root Merkle, en canvi, nomes necessita aquest fitxer.
-  - El que atesta l'arrel: 600 observacions genuines per vector, sense imputacio.
-  - El experiment_ledger.jsonl de VPS2 (mateix result_hash, testimoni creuat) NO es
-    font del digest -> millora de verificacio creuada de futur, no es barreja aqui.
+SCOPE HONESTY (essential, do not conflate)
+------------------------------------------
+  - `public_hashes.jsonl` covers the WHOLE LEDGER -> the official Merkle root
+    (OTS-sealed) is over ALL entries in physical order.
+  - `ledger_recent.json` (500/node window, grouped) is NOT the source of this file.
+    Its `merkle_root_recent` is ONLY informative. Both roots must be labelled
+    so an auditor does not confuse them.
+  - The browser's row-by-row recomputation (verifying that each result_hash is a
+    genuine HIMI output) is a SEPARATE check, limited to the vectors that get published;
+    the Merkle-root verification, by contrast, needs only this file.
+  - What the root attests: 600 genuine observations per vector, no imputation.
+  - VPS2's experiment_ledger.jsonl (same result_hash, cross-witness) is NOT the
+    source of the digest -> a future cross-verification improvement, not mixed in here.
 
-NO fa xarxa. Lectura local read-only + una escriptura atomica. Corre dins el mateix
-wrapper, just despres del snapshot i just abans de digest_daily.py:
+Does NO network. Local read-only + one atomic write. Runs inside the same
+wrapper, right after the snapshot and just before digest_daily.py:
 
     snapshot_public.py  ->  emit_public_hashes.py  ->  digest_daily.py  ->  git/ots
 
-US
---
+USAGE
+-----
   python3 emit_public_hashes.py \
-      --ledger /opt/himi/data/gr7_track_record.json \
-      --out    /opt/medussa/public_snapshot/public_hashes.jsonl
+     --ledger /opt/himi/data/gr7_track_record.json \
+     --out    /opt/medussa/public_snapshot/public_hashes.jsonl
 
   python3 emit_public_hashes.py --selftest
 
-VERIFY-BEFORE-TOUCH al desplegament:
-  1. --ledger apunta al ledger INTERN JSONL (NO al ledger_recent.json agrupat).
-  2. el camp del hash per entrada es `result_hash` (confirmat al fitxer real 3/7).
-Test d'acceptacio: les linies de public_hashes.jsonl == nombre TOTAL d'entrades del
-ledger intern (ordre de magnitud ~2846+, NO 15, NO la finestra 500/node).
+VERIFY-BEFORE-TOUCH at deployment:
+  1. --ledger points to the INTERNAL JSONL ledger (NOT the grouped ledger_recent.json).
+  2. the per-entry hash field is `result_hash` (confirmed in the real file, 3/7).
+Acceptance test: the lines of public_hashes.jsonl == the TOTAL number of entries of the
+internal ledger (order of magnitude ~2846+, NOT 15, NOT the 500/node window).
 """
 
 import argparse
@@ -73,24 +73,24 @@ import tempfile
 
 
 def load_ledger_hashes(path, field="result_hash"):
-    """Llista ORDENADA (ordre fisic) dels result_hash del ledger intern.
+    """Ordered list (physical order) of the internal ledger's result_hash values.
 
-    Auto-deteccio tolerant, pero amb guarda explicita contra la font EQUIVOCADA:
-      - JSONL (cas real de gr7_track_record.json): un objecte per linia.
-      - array JSON d'objectes / {"entries":[...]}: acceptat.
-      - dict AGRUPAT PER NODE (ledger_recent.json): REBUTJAT amb error clar,
-        perque NO es la font del digest (ni ordre fisic ni conjunt sencer).
+    Tolerant auto-detection, but with an explicit guard against the WRONG source:
+      - JSONL (the real case of gr7_track_record.json): one object per line.
+      - JSON array of objects / {"entries":[...]}: accepted.
+      - dict GROUPED BY NODE (ledger_recent.json): REJECTED with a clear error,
+        because it is NOT the source of the digest (neither physical order nor the complete set).
     """
     with open(path, "r", encoding="utf-8") as f:
         raw = f.read().strip()
     if not raw:
         return []
 
-    # Provem primer un JSON sencer (array, {"entries":[...]}, o una sola entrada).
+    # Try a whole JSON first (array, {"entries":[...]}, or a single entry).
     try:
         obj = json.loads(raw)
     except json.JSONDecodeError:
-        obj = None  # es multi-linia -> JSONL, el cas normal del ledger intern
+        obj = None  # multi-line -> JSONL, the normal case of the internal ledger
 
     if obj is not None:
         if isinstance(obj, dict) and "entries" in obj:
@@ -99,17 +99,17 @@ def load_ledger_hashes(path, field="result_hash"):
             return [str(_field(e, field)) for e in obj]
         if isinstance(obj, dict):
             if field in obj:
-                # fitxer d'una sola linia = una unica entrada
+                # single-line file = one single entry
                 return [str(obj[field])]
-            # dict sense el camp del hash -> molt probablement AGRUPAT PER NODE
+            # dict without the hash field -> most probably GROUPED BY NODE
             raise ValueError(
-                "El fitxer sembla un ledger AGRUPAT PER NODE (claus="
-                f"{list(obj.keys())[:4]}). Aixo NO es la font del digest. "
-                "Apunta a /opt/himi/data/gr7_track_record.json "
-                "(JSONL, ordre fisic, sencer)."
+                "The file looks like a ledger GROUPED BY NODE (keys="
+                f"{list(obj.keys())[:4]}). This is NOT the source of the digest. "
+                "Point to /opt/himi/data/gr7_track_record.json "
+                "(JSONL, physical order, complete)."
             )
 
-    # JSONL: un objecte per linia -> ordre de linia = ordre fisic = veritat canonica.
+    # JSONL: one object per line -> line order = physical order = canonical truth.
     out = []
     for i, line in enumerate(raw.splitlines(), 1):
         line = line.strip()
@@ -119,8 +119,8 @@ def load_ledger_hashes(path, field="result_hash"):
             entry = json.loads(line)
         except json.JSONDecodeError as e:
             raise ValueError(
-                f"Linia {i} no es JSON valid; el fitxer no sembla JSONL net. "
-                f"Detall: {e}"
+                f"Line {i} is not valid JSON; the file does not look like clean JSONL. "
+                f"Detail: {e}"
             )
         out.append(str(_field(entry, field)))
     return out
@@ -130,14 +130,14 @@ def _field(entry, field):
     if isinstance(entry, dict):
         if field not in entry:
             raise KeyError(
-                f"Entrada sense camp '{field}'. Claus: {list(entry.keys())}"
+                f"Entry without field '{field}'. Keys: {list(entry.keys())}"
             )
         return entry[field]
-    return entry  # ja es un string
+    return entry  # already a string
 
 
 def atomic_write(path, content):
-    """.tmp -> flush -> fsync -> os.replace. Mateixa disciplina que snapshot_public.py."""
+    """.tmp -> flush -> fsync -> os.replace. Same discipline as snapshot_public.py."""
     d = os.path.dirname(os.path.abspath(path))
     fd, tmp = tempfile.mkstemp(dir=d, prefix=".pubhash_", suffix=".tmp")
     try:
@@ -152,11 +152,11 @@ def atomic_write(path, content):
 
 
 def emit(ledger_path, out_path, field="result_hash"):
-    """Deriva public_hashes.jsonl del ledger intern, en ordre fisic.
+    """Derives public_hashes.jsonl from the internal ledger, in physical order.
 
-    Esquema de sortida INTACTE respecte la versio anterior: una linia per entrada,
-    {"result_hash": h}, serialitzacio canonica. No es toca el contracte amb
-    digest_daily.py (que llegeix aquest camp).
+    Output schema INTACT with respect to the previous version: one line per entry,
+    {"result_hash": h}, canonical serialization. The contract with
+    digest_daily.py (which reads this field) is not touched.
     """
     hashes = load_ledger_hashes(ledger_path, field=field)
     lines = [json.dumps({"result_hash": h}, separators=(",", ":")) for h in hashes]
@@ -170,7 +170,7 @@ def selftest():
     tmp = tempfile.mkdtemp(prefix="himi_pubhash_selftest_")
     a, b, c = "aa" * 32, "bb" * 32, "cc" * 32
 
-    # cas 1: array d'objectes
+    # case 1: array of objects
     p1 = os.path.join(tmp, "ledger_array.json")
     json.dump(
         [{"result_hash": a, "asset_id": "X"},
@@ -181,47 +181,47 @@ def selftest():
     o1 = os.path.join(tmp, "out_array.jsonl")
     n = emit(p1, o1)
     got = [json.loads(l)["result_hash"] for l in open(o1).read().splitlines()]
-    assert n == 3 and got == [a, b, c], "array: ordre/conjunt incorrecte"
-    print(f"[OK] array d'objectes -> {n} hashes, ordre preservat")
+    assert n == 3 and got == [a, b, c], "array: wrong order/set"
+    print(f"[OK] array of objects -> {n} hashes, order preserved")
 
-    # cas 2: {"entries":[...]}
+    # case 2: {"entries":[...]}
     p2 = os.path.join(tmp, "ledger_entries.json")
     json.dump({"entries": [{"result_hash": a}, {"result_hash": b}]}, open(p2, "w"))
     o2 = os.path.join(tmp, "out_entries.jsonl")
     n = emit(p2, o2)
-    assert n == 2, "entries: compte incorrecte"
+    assert n == 2, "entries: wrong count"
     print(f"[OK] {{'entries':[...]}} -> {n} hashes")
 
-    # cas 3: JSONL simple (logica aprofitada de la versio anterior)
+    # case 3: simple JSONL (logic reused from the previous version)
     p3 = os.path.join(tmp, "ledger.jsonl")
     with open(p3, "w") as f:
         for h in [a, b, c]:
             f.write(json.dumps({"result_hash": h}) + "\n")
     o3 = os.path.join(tmp, "out_jsonl.jsonl")
     n = emit(p3, o3)
-    assert n == 3, "jsonl: compte incorrecte"
-    print(f"[OK] JSONL simple -> {n} hashes")
+    assert n == 3, "jsonl: wrong count"
+    print(f"[OK] simple JSONL -> {n} hashes")
 
-    # cas 4: ledger buit -> fitxer buit, sense petar
+    # case 4: empty ledger -> empty file, no crash
     p4 = os.path.join(tmp, "empty.json")
     open(p4, "w").write("[]")
     o4 = os.path.join(tmp, "out_empty.jsonl")
     n = emit(p4, o4)
-    assert n == 0 and open(o4).read() == "", "buit: hauria de donar fitxer buit"
-    print("[OK] ledger buit -> 0 hashes, sense error")
+    assert n == 0 and open(o4).read() == "", "empty: should give an empty file"
+    print("[OK] empty ledger -> 0 hashes, no error")
 
-    # cas 5: camp inexistent -> error clar
+    # case 5: nonexistent field -> clear error
     p5 = os.path.join(tmp, "badfield.json")
     json.dump([{"hash_dolent": a}], open(p5, "w"))
     try:
         emit(p5, os.path.join(tmp, "x5.jsonl"))
-        assert False, "hauria d'haver llencat KeyError"
+        assert False, "should have thrown KeyError"
     except KeyError as e:
-        print(f"[OK] camp inexistent -> error explicit: {str(e)[:48]}...")
+        print(f"[OK] nonexistent field -> explicit error: {str(e)[:48]}...")
 
-    # cas 6: ESTRUCTURA REAL (entrades senceres, MATEIX timestamp) -> ordre fisic
-    #        Replica el que hi ha a gr7_track_record.json: dos registres amb
-    #        timestamp 1783088707. Ha de preservar l'ordre de LINIA, no ordenar.
+    # case 6: REAL STRUCTURE (whole entries, SAME timestamp) -> physical order
+    #        Replicates what is in gr7_track_record.json: two records with
+    #        timestamp 1783088707. Must preserve LINE order, not sort.
     p6 = os.path.join(tmp, "real_like.jsonl")
     e1 = {"asset_id": "NOAA:44013:WTMP", "client_id": "experiment",
           "result_hash": a, "state": "Recovery Regime",
@@ -236,10 +236,10 @@ def selftest():
     n = emit(p6, o6)
     got = [json.loads(l)["result_hash"] for l in open(o6).read().splitlines()]
     assert n == 2 and got == [a, b], \
-        "real: ha de preservar ORDRE FISIC, no reordenar per timestamp"
-    print(f"[OK] estructura real (timestamp repetit) -> {n} hashes en ordre fisic")
+        "real: must preserve PHYSICAL ORDER, not reorder by timestamp"
+    print(f"[OK] real structure (repeated timestamp) -> {n} hashes in physical order")
 
-    # cas 7: ledger AGRUPAT PER NODE -> REBUTJAT (no es la font del digest)
+    # case 7: ledger GROUPED BY NODE -> REJECTED (not the source of the digest)
     p7 = os.path.join(tmp, "grouped.json")
     json.dump(
         {"NOAA:44013:WTMP": [{"result_hash": a}],
@@ -248,23 +248,23 @@ def selftest():
     )
     try:
         emit(p7, os.path.join(tmp, "x7.jsonl"))
-        assert False, "hauria d'haver rebutjat el ledger agrupat per node"
+        assert False, "should have rejected the node-grouped ledger"
     except ValueError as e:
-        print(f"[OK] ledger agrupat rebutjat: {str(e)[:52]}...")
+        print(f"[OK] grouped ledger rejected: {str(e)[:52]}...")
 
-    print("\n=== TOTS ELS TESTS OK ===")
-    print(f"(artefactes a {tmp})")
+    print("\n=== ALL TESTS OK ===")
+    print(f"(artifacts in {tmp})")
 
 
 def main():
     p = argparse.ArgumentParser(
-        description="Deriva public_hashes.jsonl del ledger INTERN (ordre fisic, sencer)"
+        description="Derives public_hashes.jsonl from the INTERNAL ledger (physical order, complete)"
     )
     p.add_argument("--ledger",
-                   help="path del ledger INTERN JSONL (/opt/himi/data/gr7_track_record.json)")
+                   help="path of the INTERNAL JSONL ledger (/opt/himi/data/gr7_track_record.json)")
     p.add_argument("--field", default="result_hash",
-                   help="camp del hash per entrada (default: result_hash)")
-    p.add_argument("--out", help="path de sortida public_hashes.jsonl")
+                   help="hash field per entry (default: result_hash)")
+    p.add_argument("--out", help="output path for public_hashes.jsonl")
     p.add_argument("--selftest", action="store_true")
     args = p.parse_args()
 
@@ -272,10 +272,10 @@ def main():
         selftest()
         return
     if not args.ledger or not args.out:
-        p.error("cal --ledger i --out (o usa --selftest)")
+        p.error("need --ledger and --out (or use --selftest)")
 
     n = emit(args.ledger, args.out, field=args.field)
-    print(f"public_hashes.jsonl escrit: {n} entrades (ledger sencer, ordre fisic) -> {args.out}")
+    print(f"public_hashes.jsonl written: {n} entries (complete ledger, physical order) -> {args.out}")
 
 
 if __name__ == "__main__":
